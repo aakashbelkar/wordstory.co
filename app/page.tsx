@@ -1,26 +1,65 @@
 'use client'
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Moon, Info, Volume2, Link as LinkIcon, PenTool, Globe, X } from 'lucide-react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+
+// Custom SVG Icons matching your design
+const IconEn = () => <svg viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>;
+const IconHi = () => <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>;
+const IconPen = () => <svg viewBox="0 0 24 24"><path d="M12 19l7-7 3 3-7 7-3-3z"></path><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path><path d="M2 2l7.586 7.586"></path><circle cx="11" cy="11" r="2"></circle></svg>;
+const IconLink = () => <svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>;
+
+const PAGE_SIZE = 10; // Loads 10 words at a time for performance
 
 export default function Home() {
+  const router = useRouter();
   const [words, setWords] = useState<any[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [theme, setTheme] = useState('light');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const flashcardRef = useRef<HTMLDivElement>(null);
 
-  // Fetch words from Supabase
+  // 1. Initial Fetch & Get Total Count
   useEffect(() => {
-    const fetchWords = async () => {
-      const { data, error } = await supabase.from('words').select('*').order('created_at', { ascending: false });
+    const fetchInitial = async () => {
+      const { data, count } = await supabase
+        .from('words')
+        .select('*', { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .range(0, PAGE_SIZE - 1);
+        
       if (data) setWords(data);
+      if (count) setTotalCount(count);
     };
-    fetchWords();
+    fetchInitial();
   }, []);
 
-  // Theme logic
+  // 2. Infinite Pagination Logic
+  const loadMoreWords = async () => {
+    if (isLoadingMore || words.length >= totalCount) return;
+    setIsLoadingMore(true);
+    
+    const from = words.length;
+    const to = from + PAGE_SIZE - 1;
+    
+    const { data } = await supabase
+      .from('words')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .range(from, to);
+      
+    if (data) {
+      setWords(prev => [...prev, ...data]);
+    }
+    setIsLoadingMore(false);
+  };
+
+  // 3. Theme Logic
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') || 'light';
     setTheme(savedTheme);
@@ -34,7 +73,7 @@ export default function Home() {
     localStorage.setItem('theme', newTheme);
   };
 
-  // Audio logic
+  // 4. Audio Playback
   const playAudio = (word: string) => {
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
@@ -44,34 +83,63 @@ export default function Home() {
     }
   };
 
-  // Search logic
-  const handleSearch = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const query = e.target.value;
-    setSearchQuery(query);
-    if (query.length > 1) {
-      const { data } = await supabase.from('words').select('*').ilike('word', `%${query}%`).limit(5);
-      if (data) setSearchResults(data);
-    } else {
-      setSearchResults([]);
-    }
+// Updates the search bar text as you type
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
   };
 
-  const selectSearchResult = (wordId: string) => {
-    const index = words.findIndex(w => w.id === wordId);
-    if (index !== -1) {
-      setCurrentIndex(index);
-      setSearchQuery('');
-      setSearchResults([]);
-    }
+  // 5. Debounced Search Logic
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(async () => {
+      if (searchQuery.length > 0) {
+        const { data } = await supabase.from('words').select('*').ilike('word', `%${searchQuery}%`).limit(5);
+        if (data) setSearchResults(data);
+      } else {
+        setSearchResults([]);
+      }
+    }, 300); // 300ms delay protects your database
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchQuery]);
+
+  // Route to the SEO page when a search result is clicked
+  const selectSearchResult = (wordText: string) => {
+    setSearchQuery('');
+    setSearchResults([]);
+    router.push(`/word/${wordText.toLowerCase()}`);
   };
 
-  // Keyboard navigation
-  const goToNext = useCallback(() => { if (currentIndex < words.length - 1) setCurrentIndex(prev => prev + 1); }, [currentIndex, words.length]);
-  const goToPrev = useCallback(() => { if (currentIndex > 0) setCurrentIndex(prev => prev - 1); }, [currentIndex]);
+  // 6. Navigation Logic (Next/Prev)
+  const goToNext = useCallback(async () => {
+    if (currentIndex < words.length - 1) {
+      if (flashcardRef.current) flashcardRef.current.style.opacity = '0';
+      setTimeout(() => {
+        setCurrentIndex(prev => prev + 1);
+        if (flashcardRef.current) flashcardRef.current.style.opacity = '1';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }, 50);
+    }
+    
+    // Fetch more words if we are near the end of the loaded batch
+    if (currentIndex === words.length - 3) {
+      loadMoreWords();
+    }
+  }, [currentIndex, words.length, totalCount]);
 
+  const goToPrev = useCallback(() => {
+    if (currentIndex > 0) {
+      if (flashcardRef.current) flashcardRef.current.style.opacity = '0';
+      setTimeout(() => {
+        setCurrentIndex(prev => prev - 1);
+        if (flashcardRef.current) flashcardRef.current.style.opacity = '1';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }, 50);
+    }
+  }, [currentIndex]);
+
+  // 7. Keyboard Navigation (Arrows)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.target as HTMLElement).tagName === 'INPUT') return;
+      if ((e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).tagName === 'TEXTAREA') return;
       if (e.key === 'ArrowRight') goToNext();
       if (e.key === 'ArrowLeft') goToPrev();
     };
@@ -79,126 +147,219 @@ export default function Home() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [goToNext, goToPrev]);
 
-  if (words.length === 0) return <div className="min-h-screen flex items-center justify-center">Loading WordStory...</div>;
+  // 8. Touch/Swipe Navigation
+  let touchStartX = 0;
+  let touchEndX = 0;
+  const handleTouchStart = (e: React.TouchEvent) => { touchStartX = e.changedTouches[0].screenX; };
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    touchEndX = e.changedTouches[0].screenX;
+    if (touchStartX - touchEndX > 50) goToNext();
+    if (touchEndX - touchStartX > 50) goToPrev();
+  };
+
+  // Loading State
+  if (words.length === 0) {
+    return (
+      <div style={{ display: 'flex', minHeight: '100vh', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--bg-color)', color: 'var(--text-main)' }}>
+        Loading WordStory...
+      </div>
+    );
+  }
 
   const currentItem = words[currentIndex];
 
   return (
-    <div className="flex justify-center min-h-screen">
-      <div className="w-full max-w-[800px] min-h-screen bg-[var(--app-bg)] shadow-xl flex flex-col relative transition-colors duration-300">
+    <div className="app-container">
+      {/* FIXED INFO MODAL */}
+      <div className={`modal-overlay ${isModalOpen ? 'active' : ''}`} onClick={() => setIsModalOpen(false)}>
+        <div className="modal-content" onClick={e => e.stopPropagation()}>
+          <button className="close-modal" onClick={() => setIsModalOpen(false)}>&times;</button>
+          <h3 className="modal-title">How to use WordStory</h3>
+          <ul className="modal-list">
+            <li><strong>Swipe or use arrow keys</strong> to navigate through the deck.</li>
+            <li><strong>Jump to a card</strong> by typing a number in the progress indicator.</li>
+            <li><strong>Listen</strong> to the exact pronunciation by tapping the speaker icon.</li>
+            <li><strong>Search</strong> for any English word or Hindi meaning in the top bar.</li>
+          </ul>
+        </div>
+      </div>
+
+      {/* HEADER */}
+      <header className="px-dynamic">
+        <h1>WORDSTORY.co</h1>
+        <div className="header-actions">
+          <button className="icon-btn" aria-label="Information" onClick={() => setIsModalOpen(true)}>
+            <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+          </button>
+          <button className="icon-btn" aria-label="Toggle Dark Mode" onClick={toggleTheme}>
+            <svg viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+          </button>
+        </div>
+      </header>
+
+      {/* SEARCH BAR */}
+      <div className="search-wrapper px-dynamic">
+        <div className="search-input-container">
+          <input 
+            type="text" 
+            id="searchInput" 
+            placeholder="Search vocabulary..." 
+            autoComplete="off" 
+            value={searchQuery} 
+            onChange={handleSearch} 
+          />
+          {searchQuery && (
+            <button id="clearBtn" aria-label="Clear search" onClick={() => { setSearchQuery(''); setSearchResults([]); }}>
+              &times;
+            </button>
+          )}
+        </div>
         
-        {/* Info Modal */}
-        {isModalOpen && (
-          <div className="fixed inset-0 bg-[var(--modal-overlay)] z-50 flex items-center justify-center backdrop-blur-sm" onClick={() => setIsModalOpen(false)}>
-            <div className="bg-[var(--app-bg)] w-[85%] max-w-[500px] p-8 rounded-2xl border border-[var(--border)] relative shadow-2xl" onClick={e => e.stopPropagation()}>
-              <button onClick={() => setIsModalOpen(false)} className="absolute top-4 right-4 p-2 rounded-full hover:bg-[var(--hover-bg)] text-[var(--text-light)]"><X size={20} /></button>
-              <h3 className="font-serif text-2xl mb-4">How to use WordStory</h3>
-              <ul className="list-disc pl-5 text-[var(--text-light)] space-y-3">
-                <li><strong>Swipe or use arrow keys</strong> to navigate.</li>
-                <li><strong>Listen</strong> to the exact pronunciation by tapping the speaker icon.</li>
-                <li><strong>Search</strong> for any English word or Hindi meaning in the top bar.</li>
-              </ul>
-            </div>
+        {/* AUTOCOMPLETE DROPDOWN */}
+        {searchResults.length > 0 && (
+          <ul className="autocomplete-dropdown" style={{ display: 'block' }}>
+            {searchResults.map((result) => (
+              <li key={result.id} className="autocomplete-item" onClick={() => selectSearchResult(result.word)}>
+                <span className="auto-word">{result.word}</span>
+                <span className="auto-meaning">{result.meaning_en}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {/* TOP CONTROLS */}
+      <div className="nav-controls px-dynamic">
+        <button className="nav-btn prevBtn" onClick={goToPrev} disabled={currentIndex === 0}>&larr; Prev</button>
+        <div className="progress-container">
+          <input 
+            type="number" 
+            className="progress-input" 
+            min="1" 
+            max={totalCount} 
+            value={currentIndex + 1} 
+            onChange={(e) => {
+              let val = Number(e.target.value);
+              if (val >= 1 && val <= totalCount) {
+                setCurrentIndex(val - 1);
+              }
+            }} 
+          />
+          <span className="totalProgress"> / {totalCount}</span>
+        </div>
+        <button className="nav-btn nextBtn" onClick={goToNext} disabled={currentIndex === totalCount - 1}>Next &rarr;</button>
+      </div>
+
+      {/* FLASHCARD CONTENT */}
+      <div className="flashcard-container px-dynamic" id="flashcardArea" ref={flashcardRef} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+        
+        <div className="word-header-row">
+          {/* Link to SEO page so bots can crawl it easily */}
+          <Link href={`/word/${currentItem.word.toLowerCase()}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+            <h2 className="word-title">{currentItem.word}</h2>
+          </Link>
+          <button className="audio-btn" aria-label="Listen" onClick={() => playAudio(currentItem.word)}>
+            <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+          </button>
+        </div>
+        <div className="word-phonetic">{currentItem.phonetic}</div>
+
+        {/* HERO IMAGE */}
+        {currentItem.image_url && (
+          <div className="hero-image-container">
+            <img 
+              src={currentItem.image_url} 
+              alt={currentItem.word} 
+              className="hero-image" 
+              onError={(e) => e.currentTarget.parentElement!.style.display = 'none'}
+            />
           </div>
         )}
 
-        {/* Header */}
-        <header className="px-5 sm:px-10 pt-5 pb-4 flex justify-between items-center border-b border-[var(--border)]">
-          <h1 className="font-serif text-2xl font-bold tracking-tight">WORDSTORY.co</h1>
-          <div className="flex gap-2">
-            <button onClick={() => setIsModalOpen(true)} className="p-2 rounded-full hover:bg-[var(--hover-bg)] text-[var(--icon-color)]"><Info size={22} /></button>
-            <button onClick={toggleTheme} className="p-2 rounded-full hover:bg-[var(--hover-bg)] text-[var(--icon-color)]"><Moon size={22} /></button>
-          </div>
-        </header>
-
-        {/* Search */}
-        <div className="px-5 sm:px-10 pt-4 relative z-40">
-          <div className="relative flex items-center">
-            <input type="text" value={searchQuery} onChange={handleSearch} placeholder="Search vocabulary..." className="w-full py-3 px-5 rounded-full border border-[var(--border)] bg-[var(--bg-color)] text-[var(--text-main)] outline-none focus:border-[var(--text-light)] focus:ring-4 focus:ring-[var(--accent-bg)] transition-all" />
-          </div>
-          {searchResults.length > 0 && (
-            <ul className="absolute top-full left-5 right-5 sm:left-10 sm:right-10 mt-2 bg-[var(--app-bg)] border border-[var(--border)] rounded-xl shadow-lg overflow-hidden">
-              {searchResults.map(result => (
-                <li key={result.id} onClick={() => selectSearchResult(result.id)} className="p-3 px-5 cursor-pointer hover:bg-[var(--hover-bg)] border-b border-[var(--border)] last:border-0 flex flex-col gap-1">
-                  <span className="font-semibold text-[var(--text-main)]">{result.word}</span>
-                  <span className="text-sm text-[var(--text-light)]">{result.meaning_en}</span>
-                </li>
-              ))}
-            </ul>
-          )}
+        {/* MEANINGS */}
+        <div className="content-section">
+          <div className="section-header"><IconEn /> Meaning in English</div>
+          <p className="content-text">{currentItem.meaning_en}</p>
         </div>
 
-        {/* Top Controls */}
-        <div className="px-5 sm:px-10 py-4 flex justify-between items-center border-b border-[var(--border)]">
-          <button onClick={goToPrev} disabled={currentIndex === 0} className="font-semibold text-[var(--text-light)] disabled:opacity-30 hover:text-[var(--text-main)] px-3 py-2">&larr; Prev</button>
-          <div className="flex items-center bg-[var(--bg-color)] px-4 py-1.5 rounded-full text-[var(--text-light)] font-medium">
-            <input type="number" value={currentIndex + 1} onChange={(e) => setCurrentIndex(Number(e.target.value) - 1)} className="bg-transparent border-none text-[var(--text-main)] font-semibold text-right w-8 outline-none" min="1" max={words.length} />
-            <span> / {words.length}</span>
-          </div>
-          <button onClick={goToNext} disabled={currentIndex === words.length - 1} className="font-semibold text-[var(--text-light)] disabled:opacity-30 hover:text-[var(--text-main)] px-3 py-2">Next &rarr;</button>
+        <div className="content-section">
+          <div className="section-header"><IconHi /> Meaning in Hindi</div>
+          <p className="content-text hindi">{currentItem.meaning_hi}</p>
         </div>
 
-        {/* Flashcard Area */}
-        <div className="flex-grow px-5 sm:px-10 py-8 overflow-y-auto">
-          <div className="flex justify-between items-start mb-1">
-            <h2 className="font-serif text-4xl sm:text-6xl font-bold m-0 leading-tight">{currentItem.word}</h2>
-            <button onClick={() => playAudio(currentItem.word)} className="bg-[var(--accent-bg)] text-[var(--accent-text)] rounded-full w-11 h-11 flex items-center justify-center flex-shrink-0 ml-4 hover:scale-95 transition-transform"><Volume2 size={22} /></button>
+        {/* EXAMPLES */}
+        {currentItem.example_en && (
+          <div className="content-section">
+            <div className="section-header"><IconPen /> Example in English</div>
+            <p className="content-text" dangerouslySetInnerHTML={{ __html: currentItem.example_en }} />
           </div>
-          <div className="text-[var(--text-light)] mb-8 tracking-wide">{currentItem.phonetic}</div>
+        )}
 
-          {currentItem.image_url && (
-            <div className="w-full aspect-video sm:aspect-[4/3] bg-[var(--image-bg)] rounded-2xl overflow-hidden mb-8 shadow-sm flex items-center justify-center">
-              <img src={currentItem.image_url} alt={currentItem.word} className="w-full h-full object-cover" />
-            </div>
-          )}
+        {currentItem.example_hi && (
+          <div className="content-section">
+            <div className="section-header"><IconPen /> Example in Hindi</div>
+            <p className="content-text hindi" dangerouslySetInnerHTML={{ __html: currentItem.example_hi }} />
+          </div>
+        )}
 
-          {/* Meanings & Examples */}
-          <div className="space-y-6">
-            <div>
-              <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-light)] uppercase tracking-wider mb-2"><Globe size={16} /> Meaning in English</div>
-              <p className="text-lg text-[var(--text-main)]">{currentItem.meaning_en}</p>
-            </div>
-            <div>
-              <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-light)] uppercase tracking-wider mb-2"><Globe size={16} /> Meaning in Hindi</div>
-              <p className="text-xl font-hindi text-[var(--text-main)]">{currentItem.meaning_hi}</p>
-            </div>
-            {currentItem.example_en && (
-              <div>
-                <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-light)] uppercase tracking-wider mb-2"><PenTool size={16} /> Example in English</div>
-                <p className="text-lg text-[var(--text-main)]" dangerouslySetInnerHTML={{ __html: currentItem.example_en }} />
+        {/* RELATIONS */}
+        {(currentItem.synonyms?.length > 0 || currentItem.antonyms?.length > 0 || currentItem.word_family?.length > 0 || currentItem.collocations?.length > 0) && (
+          <div className="relations-wrapper">
+            <div className="relations-main-title"><IconLink /> Word Relations</div>
+            
+            {currentItem.synonyms?.length > 0 && (
+              <div className="relation-group">
+                <h4>Synonyms</h4>
+                <div className="tag-list">{currentItem.synonyms.map((t: string) => <span key={t} className="tag">{t}</span>)}</div>
               </div>
             )}
-            {currentItem.example_hi && (
-              <div>
-                <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-light)] uppercase tracking-wider mb-2"><PenTool size={16} /> Example in Hindi</div>
-                <p className="text-xl font-hindi text-[var(--text-main)]" dangerouslySetInnerHTML={{ __html: currentItem.example_hi }} />
+
+            {currentItem.antonyms?.length > 0 && (
+              <div className="relation-group">
+                <h4>Antonyms</h4>
+                <div className="tag-list">{currentItem.antonyms.map((t: string) => <span key={t} className="tag">{t}</span>)}</div>
+              </div>
+            )}
+
+            {currentItem.word_family?.length > 0 && (
+              <div className="relation-group">
+                <h4>Word Family</h4>
+                <div className="tag-list">{currentItem.word_family.map((t: string) => <span key={t} className="tag">{t}</span>)}</div>
+              </div>
+            )}
+
+            {currentItem.collocations?.length > 0 && (
+              <div className="relation-group">
+                <h4>Collocations</h4>
+                <div className="tag-list">{currentItem.collocations.map((t: string) => <span key={t} className="tag">{t}</span>)}</div>
               </div>
             )}
           </div>
-
-          {/* Word Relations */}
-          {(currentItem.synonyms || currentItem.antonyms) && (
-            <div className="mt-10 pt-8 border-t border-[var(--border)]">
-              <div className="text-xl font-bold flex items-center gap-2 mb-6 text-[var(--text-main)]"><LinkIcon size={22} /> Word Relations</div>
-              
-              <div className="space-y-5">
-                {currentItem.synonyms && currentItem.synonyms.length > 0 && (
-                  <div>
-                    <h4 className="text-sm font-semibold text-[var(--text-light)] mb-3">Synonyms</h4>
-                    <div className="flex flex-wrap gap-2">{currentItem.synonyms.map((s: string) => <span key={s} className="bg-[var(--accent-tag-bg)] text-[var(--accent-tag-text)] px-3 py-1.5 rounded-lg text-sm font-medium">{s}</span>)}</div>
-                  </div>
-                )}
-                {currentItem.antonyms && currentItem.antonyms.length > 0 && (
-                  <div>
-                    <h4 className="text-sm font-semibold text-[var(--text-light)] mb-3">Antonyms</h4>
-                    <div className="flex flex-wrap gap-2">{currentItem.antonyms.map((s: string) => <span key={s} className="bg-[var(--accent-tag-bg)] text-[var(--accent-tag-text)] px-3 py-1.5 rounded-lg text-sm font-medium">{s}</span>)}</div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
+        )}
       </div>
+
+      {/* BOTTOM CONTROLS */}
+      <div className="nav-controls bottom px-dynamic">
+        <button className="nav-btn prevBtn" onClick={goToPrev} disabled={currentIndex === 0}>&larr; Prev</button>
+        <div className="progress-container">
+          <input 
+            type="number" 
+            className="progress-input" 
+            min="1" 
+            max={totalCount} 
+            value={currentIndex + 1} 
+            onChange={(e) => {
+              let val = Number(e.target.value);
+              if (val >= 1 && val <= totalCount) {
+                setCurrentIndex(val - 1);
+              }
+            }} 
+          />
+          <span className="totalProgress"> / {totalCount}</span>
+        </div>
+        <button className="nav-btn nextBtn" onClick={goToNext} disabled={currentIndex === totalCount - 1}>Next &rarr;</button>
+      </div>
+
     </div>
   );
 }
