@@ -17,14 +17,13 @@ interface WordClientProps {
   currentIndex: number;
 }
 
-// Generates a consistent premium dark gradient based on the word length
 const getPremiumGradient = (word: string) => {
   const gradients = [
-    'linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%)', // Deep Sea
-    'linear-gradient(135deg, #141e30 0%, #243b55 100%)', // Midnight
-    'linear-gradient(135deg, #2b5876 0%, #4e4376 100%)', // Deep Space
-    'linear-gradient(135deg, #1e1366 0%, #2a0845 100%)', // Royal Dark
-    'linear-gradient(135deg, #232526 0%, #414345 100%)'  // Carbon
+    'linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%)',
+    'linear-gradient(135deg, #141e30 0%, #243b55 100%)',
+    'linear-gradient(135deg, #2b5876 0%, #4e4376 100%)',
+    'linear-gradient(135deg, #1e1366 0%, #2a0845 100%)',
+    'linear-gradient(135deg, #232526 0%, #414345 100%)'
   ];
   return gradients[word.length % gradients.length];
 };
@@ -37,6 +36,9 @@ export default function WordClient({ currentItem, prevWord, nextWord, totalCount
   const [isModalOpen, setIsModalOpen] = useState(false);
   const flashcardRef = useRef<HTMLDivElement>(null);
 
+  // Calculate Progress Percentage for the Edge Bar
+  const progressPercentage = ((currentIndex + 1) / totalCount) * 100;
+
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') || 'light';
     setTheme(savedTheme);
@@ -44,13 +46,22 @@ export default function WordClient({ currentItem, prevWord, nextWord, totalCount
   }, []);
 
   const toggleTheme = () => {
+    triggerHaptic();
     const newTheme = theme === 'light' ? 'dark' : 'light';
     setTheme(newTheme);
     document.documentElement.setAttribute('data-theme', newTheme);
     localStorage.setItem('theme', newTheme);
   };
 
+  // --- HAPTIC FEEDBACK (Micro-interaction magic) ---
+  const triggerHaptic = () => {
+    if (typeof window !== 'undefined' && window.navigator && window.navigator.vibrate) {
+      window.navigator.vibrate(15); // A crisp, 15ms physical "tick" on mobile
+    }
+  };
+
   const playAudio = (word: string) => {
+    triggerHaptic();
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(word);
@@ -72,6 +83,7 @@ export default function WordClient({ currentItem, prevWord, nextWord, totalCount
   }, [searchQuery]);
 
   const selectSearchResult = (wordText: string) => {
+    triggerHaptic();
     setSearchQuery('');
     setSearchResults([]);
     router.push(`/word/${wordText.toLowerCase()}`);
@@ -79,6 +91,7 @@ export default function WordClient({ currentItem, prevWord, nextWord, totalCount
 
   const navigateTo = (word: string | null) => {
     if (!word) return;
+    triggerHaptic(); // Vibrate when swiping or clicking next!
     if (flashcardRef.current) {
       flashcardRef.current.style.transform = 'translateY(10px)';
       flashcardRef.current.style.opacity = '0';
@@ -109,17 +122,21 @@ export default function WordClient({ currentItem, prevWord, nextWord, totalCount
   const handleJumpToCard = async (e: React.ChangeEvent<HTMLInputElement>) => {
     let val = Number(e.target.value);
     if (val >= 1 && val <= totalCount) {
+      triggerHaptic();
       const { data } = await supabase.from('words').select('word').order('word', { ascending: true }).range(val - 1, val - 1).single();
       if (data) navigateTo(data.word);
     }
   };
 
   return (
-    <div className="app-container">
+    <div className="app-container" style={{ position: 'relative' }}>
+      {/* THE EDGE PROGRESS BAR */}
+      <div style={{ position: 'absolute', top: 0, left: 0, height: '4px', backgroundColor: 'var(--accent-text)', width: `${progressPercentage}%`, zIndex: 9999, transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1)', borderTopRightRadius: '4px', borderBottomRightRadius: '4px', boxShadow: '0 0 10px var(--accent-text)' }} />
+
       {/* GLASSMORPHIC INFO MODAL */}
       <div className={`modal-overlay ${isModalOpen ? 'active' : ''}`} style={{ backdropFilter: 'blur(8px)', backgroundColor: 'rgba(0,0,0,0.4)' }} onClick={() => setIsModalOpen(false)}>
         <div className="modal-content" style={{ backdropFilter: 'blur(20px)', backgroundColor: 'var(--app-bg)', border: '1px solid rgba(255,255,255,0.1)' }} onClick={e => e.stopPropagation()}>
-          <button className="close-modal" onClick={() => setIsModalOpen(false)}>&times;</button>
+          <button className="close-modal" onClick={() => { triggerHaptic(); setIsModalOpen(false); }}>&times;</button>
           <h3 className="modal-title">How to use WordStory</h3>
           <ul className="modal-list">
             <li><strong>Swipe or use arrow keys</strong> to navigate through the deck.</li>
@@ -135,7 +152,7 @@ export default function WordClient({ currentItem, prevWord, nextWord, totalCount
           <h1>WORDSTORY.co</h1>
         </Link>
         <div className="header-actions">
-          <button className="icon-btn" aria-label="Information" onClick={() => setIsModalOpen(true)}>
+          <button className="icon-btn" aria-label="Information" onClick={() => { triggerHaptic(); setIsModalOpen(true); }}>
             <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
           </button>
           <button className="icon-btn" aria-label="Toggle Dark Mode" onClick={toggleTheme}>
@@ -148,7 +165,7 @@ export default function WordClient({ currentItem, prevWord, nextWord, totalCount
       <div className="search-wrapper px-dynamic">
         <div className="search-input-container">
           <input type="text" id="searchInput" placeholder="Search vocabulary..." autoComplete="off" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
-          {searchQuery && <button id="clearBtn" aria-label="Clear search" onClick={() => { setSearchQuery(''); setSearchResults([]); }}>&times;</button>}
+          {searchQuery && <button id="clearBtn" aria-label="Clear search" onClick={() => { triggerHaptic(); setSearchQuery(''); setSearchResults([]); }}>&times;</button>}
         </div>
         {searchResults.length > 0 && (
           <ul className="autocomplete-dropdown" style={{ display: 'block', backdropFilter: 'blur(16px)', backgroundColor: theme === 'dark' ? 'rgba(30,30,30,0.85)' : 'rgba(255,255,255,0.85)' }}>
@@ -184,25 +201,15 @@ export default function WordClient({ currentItem, prevWord, nextWord, totalCount
           {currentItem.image_url && (
             <img src={currentItem.image_url} alt={currentItem.word} style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', top: 0, left: 0 }} />
           )}
-          
-          {/* Dark Gradient Overlay for text readability */}
           <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.3) 50%, transparent 100%)' }}></div>
-          
-          {/* Card Content Overlay */}
           <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
             <div>
               <h2 style={{ color: '#ffffff', fontFamily: 'var(--font-serif)', fontSize: '48px', fontWeight: 700, margin: '0 0 4px 0', lineHeight: 1 }}>{currentItem.word}</h2>
               <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: '18px', letterSpacing: '0.02em' }}>{currentItem.phonetic}</div>
             </div>
-            
-            {/* Glassmorphic Audio Button */}
             <button 
               onClick={() => playAudio(currentItem.word)}
-              style={{ 
-                width: '48px', height: '48px', borderRadius: '50%', border: 'none', cursor: 'pointer',
-                background: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(10px)', color: '#fff',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'transform 0.1s ease, background 0.2s ease'
-              }}
+              style={{ width: '48px', height: '48px', borderRadius: '50%', border: 'none', cursor: 'pointer', background: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(10px)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'transform 0.1s ease, background 0.2s ease' }}
               onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.92)'}
               onMouseUp={(e) => e.currentTarget.style.transform = 'scale(1)'}
               onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
@@ -222,20 +229,28 @@ export default function WordClient({ currentItem, prevWord, nextWord, totalCount
           <p className="content-text hindi">{currentItem.meaning_hi}</p>
         </div>
 
+        {/* EDITORIAL QUOTE DESIGN FOR EXAMPLES */}
         {currentItem.example_en && (
           <div className="content-section">
             <div className="section-header"><IconPen /> Example in English</div>
-            <p className="content-text" dangerouslySetInnerHTML={{ __html: currentItem.example_en }} />
+            <div style={{ position: 'relative', padding: '16px 20px', background: 'var(--hover-bg)', borderLeft: '4px solid var(--accent-text)', borderRadius: '0 8px 8px 0', marginTop: '8px' }}>
+              <span style={{ position: 'absolute', top: '-10px', right: '16px', fontSize: '72px', fontFamily: 'var(--font-serif)', color: 'var(--accent-text)', opacity: 0.1, lineHeight: 1 }}>"</span>
+              <p className="content-text" style={{ position: 'relative', zIndex: 1 }} dangerouslySetInnerHTML={{ __html: currentItem.example_en }} />
+            </div>
           </div>
         )}
 
         {currentItem.example_hi && (
           <div className="content-section">
             <div className="section-header"><IconPen /> Example in Hindi</div>
-            <p className="content-text hindi" dangerouslySetInnerHTML={{ __html: currentItem.example_hi }} />
+            <div style={{ position: 'relative', padding: '16px 20px', background: 'var(--hover-bg)', borderLeft: '4px solid var(--accent-text)', borderRadius: '0 8px 8px 0', marginTop: '8px' }}>
+              <span style={{ position: 'absolute', top: '-10px', right: '16px', fontSize: '72px', fontFamily: 'var(--font-serif)', color: 'var(--accent-text)', opacity: 0.1, lineHeight: 1 }}>"</span>
+              <p className="content-text hindi" style={{ position: 'relative', zIndex: 1 }} dangerouslySetInnerHTML={{ __html: currentItem.example_hi }} />
+            </div>
           </div>
         )}
 
+        {/* RELATIONS */}
         {(currentItem.synonyms?.length > 0 || currentItem.antonyms?.length > 0 || currentItem.word_family?.length > 0 || currentItem.collocations?.length > 0) && (
           <div className="relations-wrapper">
             <div className="relations-main-title"><IconLink /> Word Relations</div>

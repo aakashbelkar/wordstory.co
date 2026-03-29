@@ -1,39 +1,52 @@
 export default function Loading() {
   return (
-    <div className="app-container" style={{ alignItems: 'center', justifyContent: 'center' }}>
-      {/* Inline style for the smooth spinning animation */}
+    <div className="app-container">
       <style>{`
-        @keyframes smoothSpin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
+        @keyframes shimmer {
+          0% { background-position: -1000px 0; }
+          100% { background-position: 1000px 0; }
         }
-        .loading-spinner {
-          animation: smoothSpin 1s linear infinite;
-          color: var(--accent-text); /* Uses your signature green */
-        }
-        .pulse-text {
-          animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-        }
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: .6; }
+        .skeleton {
+          background: linear-gradient(90deg, var(--hover-bg) 25%, var(--border) 50%, var(--hover-bg) 75%);
+          background-size: 1000px 100%;
+          animation: shimmer 2s infinite linear;
+          border-radius: 8px;
         }
       `}</style>
-      
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
-        {/* SVG Spinner */}
-        <svg className="loading-spinner" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
-        </svg>
-        
-        {/* Branded Text */}
-        <div style={{ textAlign: 'center' }}>
-          <h2 style={{ fontFamily: 'var(--font-logo)', fontSize: '28px', fontWeight: '700', color: 'var(--text-main)', margin: '0 0 8px 0', letterSpacing: '-0.02em' }}>
-            WORDSTORY.co
-          </h2>
-          <p className="pulse-text" style={{ color: 'var(--text-light)', margin: 0, fontSize: '16px', fontWeight: '500' }}>
-            Loading word...
-          </p>
+
+      {/* Static Header so the app structure never jumps */}
+      <header className="px-dynamic">
+        <h1 style={{ color: 'var(--text-main)', opacity: 0.5 }}>WORDSTORY.co</h1>
+        <div className="skeleton" style={{ width: '32px', height: '32px', borderRadius: '50%' }}></div>
+      </header>
+
+      {/* Search Bar Skeleton */}
+      <div className="search-wrapper px-dynamic">
+        <div className="skeleton" style={{ width: '100%', height: '50px', borderRadius: '999px' }}></div>
+      </div>
+
+      {/* Nav Skeleton */}
+      <div className="nav-controls px-dynamic">
+        <div className="skeleton" style={{ width: '60px', height: '24px' }}></div>
+        <div className="skeleton" style={{ width: '80px', height: '32px', borderRadius: '999px' }}></div>
+        <div className="skeleton" style={{ width: '60px', height: '24px' }}></div>
+      </div>
+
+      <div className="flashcard-container px-dynamic">
+        {/* Hero Image Skeleton (Matches your 4/3 aspect ratio perfectly) */}
+        <div className="skeleton" style={{ width: '100%', aspectRatio: '4/3', borderRadius: '20px', marginBottom: '32px' }}></div>
+
+        {/* Text Block Skeletons */}
+        <div style={{ marginBottom: '32px' }}>
+          <div className="skeleton" style={{ width: '120px', height: '16px', marginBottom: '12px' }}></div>
+          <div className="skeleton" style={{ width: '100%', height: '20px', marginBottom: '8px' }}></div>
+          <div className="skeleton" style={{ width: '85%', height: '20px' }}></div>
+        </div>
+
+        <div style={{ marginBottom: '32px' }}>
+          <div className="skeleton" style={{ width: '120px', height: '16px', marginBottom: '12px' }}></div>
+          <div className="skeleton" style={{ width: '95%', height: '20px', marginBottom: '8px' }}></div>
+          <div className="skeleton" style={{ width: '70%', height: '20px' }}></div>
         </div>
       </div>
     </div>
