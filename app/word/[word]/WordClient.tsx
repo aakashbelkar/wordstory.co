@@ -6,7 +6,7 @@ import { useRouter, useParams } from 'next/navigation';
 
 // --- ICONS ---
 const IconEn = () => <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>;
-const IconHi = () => <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>;
+const IconHi = () => <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1 4-10z"></path></svg>;
 const IconPen = () => <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 19l7-7 3 3-7 7-3-3z"></path><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path><path d="M2 2l7.586 7.586"></path><circle cx="11" cy="11" r="2"></circle></svg>;
 const IconLink = () => <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>;
 const IconBook = () => <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>;
@@ -46,6 +46,14 @@ export default function WordClient({ currentItem, prevWord, nextWord, totalCount
 
   const [bookmarks, setBookmarks] = useState<string[]>([]);
   const [isBookmarksOpen, setIsBookmarksOpen] = useState(false);
+
+  // LOCAL STATE FOR PAGE NUMBER NAVIGATION
+  const [jumpValue, setJumpValue] = useState<string>(String(currentIndex + 1));
+
+  // Sync the box when words change naturally (e.g., swiping or clicking next)
+  useEffect(() => {
+    setJumpValue(String(currentIndex + 1));
+  }, [currentIndex]);
 
   useEffect(() => {
     const savedStudyMode = localStorage.getItem('studyMode');
@@ -193,12 +201,31 @@ export default function WordClient({ currentItem, prevWord, nextWord, totalCount
     if (touchEndX - touchStartX > 50) navigateTo(prevWord);
   };
 
-  const handleJumpToCard = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    let val = Number(e.target.value);
-    if (val >= 1 && val <= totalCount) {
-      triggerHaptic();
-      const { data } = await supabase.from('words').select('word').order('word', { ascending: true }).range(val - 1, val - 1).single();
-      if (data) navigateTo(data.word);
+  // THE NEW "ENTER ONLY" JUMP LOGIC WITH VALIDATION (FIXED)
+  const handleJumpKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      let val = Number(jumpValue);
+      
+      if (val >= 1 && val <= totalCount) {
+        // 1. Blur immediately so we don't lose the reference after the await
+        e.currentTarget.blur();
+        
+        triggerHaptic();
+        
+        const { data } = await supabase
+          .from('words')
+          .select('word')
+          .order('word', { ascending: true })
+          .range(val - 1, val - 1)
+          .single();
+          
+        if (data) {
+          navigateTo(data.word);
+        }
+      } else {
+        alert(`Invalid Entry. Please enter a page number between 1 and ${totalCount}.`);
+        setJumpValue(String(currentIndex + 1));
+      }
     }
   };
 
@@ -323,6 +350,70 @@ export default function WordClient({ currentItem, prevWord, nextWord, totalCount
           border-color: var(--accent-text);
           box-shadow: 0 8px 24px rgba(var(--accent-rgb), 0.3);
         }
+
+        /* --- THE BULLETPROOF NAVIGATION CSS --- */
+        .nav-controls {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin: 16px auto;
+          width: 100%;
+          max-width: 600px;
+          gap: 12px;
+          box-sizing: border-box;
+        }
+
+        .nav-btn {
+          flex: 0 1 35%; /* Limits how wide the buttons can grow */
+          min-width: 0; /* CRITICAL FOR ELLIPSIS ON MOBILE */
+          display: flex;
+          align-items: center;
+          background: var(--card-bg);
+          border: 1px solid var(--border);
+          padding: 8px 12px;
+          border-radius: 12px;
+          font-weight: 700;
+          font-size: 13px;
+          color: var(--text-main);
+          cursor: pointer;
+          box-sizing: border-box;
+          transition: all 0.2s ease;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+        }
+
+        .nav-text-span {
+          display: block;
+          flex: 1; /* Pushes the arrows to the edge naturally */
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          margin: 0 4px;
+        }
+
+        .progress-container {
+          flex-shrink: 0; /* Prevents center from being crushed */
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 4px;
+          color: var(--text-light);
+          font-size: 12px;
+          font-weight: 800;
+          min-width: 85px; /* Hard floor so it stays centered */
+        }
+
+        .progress-input {
+          width: 44px;
+          text-align: center;
+          border: 1px solid var(--border);
+          border-radius: 6px;
+          padding: 4px 0;
+          background: var(--hover-bg);
+          color: var(--text-main);
+          font-size: 12px;
+          font-weight: 900;
+          outline: none;
+        }
       `}</style>
 
       {/* Ambient Orbs */}
@@ -407,44 +498,32 @@ export default function WordClient({ currentItem, prevWord, nextWord, totalCount
           )}
         </div>
 
+        {/* --- FIXED TOP NAVIGATION --- */}
         <div className="nav-controls px-dynamic">
-          {/* PREVIOUS BUTTON */}
-          <button 
-            onClick={() => navigateTo(prevWord)} 
-            className="nav-btn" 
-            style={{ opacity: prevWord ? 1 : 0.2, cursor: prevWord ? 'pointer' : 'default' }}
-          >
-            <span style={{ fontSize: '16px' }}>&larr;</span>
-            <span className="nav-text-span">{prevWord || 'Prev'}</span>
+          <button onClick={() => navigateTo(prevWord)} className="nav-btn" style={{ opacity: prevWord ? 1 : 0.3, cursor: prevWord ? 'pointer' : 'default' }}>
+            <span style={{ fontSize: '16px', flexShrink: 0 }}>&larr;</span>
+            <span className="nav-text-span" style={{ textAlign: 'left' }}>{prevWord || 'Prev'}</span>
           </button>
           
-          {/* CENTER PROGRESS */}
           <div className="progress-container">
             <input 
-  type="number" 
-  className="progress-input" 
-  value={currentIndex + 1} 
-  onChange={handleJumpToCard}
-  onFocus={(e) => e.target.select()}
-  inputMode="numeric" // Forces numeric keypad on iPhone/Android
-  min="1"
-  max={totalCount}
-/>
-            <span>/ {totalCount}</span>
+              type="number" 
+              className="progress-input" 
+              value={jumpValue} 
+              onChange={(e) => setJumpValue(e.target.value)}
+              onKeyDown={handleJumpKeyDown}
+              onBlur={() => setJumpValue(String(currentIndex + 1))}
+              onFocus={(e) => e.target.select()}
+              inputMode="numeric"
+              min="1"
+              max={totalCount}
+            />
+            <span> / {totalCount}</span>
           </div>
           
-          {/* NEXT BUTTON */}
-          <button 
-            onClick={() => navigateTo(nextWord)} 
-            className="nav-btn" 
-            style={{ 
-              opacity: nextWord ? 1 : 0.3, 
-              cursor: nextWord ? 'pointer' : 'default',
-              justifyContent: 'flex-end' 
-            }}
-          >
-            <span className="nav-text-span">{nextWord || 'Next'}</span>
-            <span style={{ fontSize: '16px' }}>&rarr;</span>
+          <button onClick={() => navigateTo(nextWord)} className="nav-btn" style={{ opacity: nextWord ? 1 : 0.3, cursor: nextWord ? 'pointer' : 'default' }}>
+            <span className="nav-text-span" style={{ textAlign: 'right' }}>{nextWord || 'Next'}</span>
+            <span style={{ fontSize: '16px', flexShrink: 0 }}>&rarr;</span>
           </button>
         </div>
 
@@ -528,44 +607,41 @@ export default function WordClient({ currentItem, prevWord, nextWord, totalCount
             </div>
           </div>
         </div>
+
+        {/* --- FIXED BOTTOM NAVIGATION --- */}
         <div className="nav-controls px-dynamic">
-          {/* PREVIOUS BUTTON */}
           <button 
             onClick={() => navigateTo(prevWord)} 
             className="nav-btn" 
-            style={{ opacity: prevWord ? 1 : 0.2, cursor: prevWord ? 'pointer' : 'default' }}
+            style={{ opacity: prevWord ? 1 : 0.3, cursor: prevWord ? 'pointer' : 'default' }}
           >
-            <span style={{ fontSize: '16px' }}>&larr;</span>
-            <span className="nav-text-span">{prevWord || 'Prev'}</span>
+            <span style={{ fontSize: '16px', flexShrink: 0 }}>&larr;</span>
+            <span className="nav-text-span" style={{ textAlign: 'left' }}>{prevWord || 'Prev'}</span>
           </button>
           
-          {/* CENTER PROGRESS */}
           <div className="progress-container">
             <input 
-  type="number" 
-  className="progress-input" 
-  value={currentIndex + 1} 
-  onChange={handleJumpToCard}
-  onFocus={(e) => e.target.select()}
-  inputMode="numeric" // Forces numeric keypad on iPhone/Android
-  min="1"
-  max={totalCount}
-/>
-            <span>/ {totalCount}</span>
+              type="number" 
+              className="progress-input" 
+              value={jumpValue} 
+              onChange={(e) => setJumpValue(e.target.value)}
+              onKeyDown={handleJumpKeyDown}
+              onBlur={() => setJumpValue(String(currentIndex + 1))}
+              onFocus={(e) => e.target.select()}
+              inputMode="numeric"
+              min="1"
+              max={totalCount}
+            />
+            <span> / {totalCount}</span>
           </div>
           
-          {/* NEXT BUTTON */}
           <button 
             onClick={() => navigateTo(nextWord)} 
             className="nav-btn" 
-            style={{ 
-              opacity: nextWord ? 1 : 0.3, 
-              cursor: nextWord ? 'pointer' : 'default',
-              justifyContent: 'flex-end' 
-            }}
+            style={{ opacity: nextWord ? 1 : 0.3, cursor: nextWord ? 'pointer' : 'default' }}
           >
-            <span className="nav-text-span">{nextWord || 'Next'}</span>
-            <span style={{ fontSize: '16px' }}>&rarr;</span>
+            <span className="nav-text-span" style={{ textAlign: 'right' }}>{nextWord || 'Next'}</span>
+            <span style={{ fontSize: '16px', flexShrink: 0 }}>&rarr;</span>
           </button>
         </div>
       </div>
