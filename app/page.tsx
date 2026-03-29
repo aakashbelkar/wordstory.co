@@ -1,24 +1,35 @@
 import { redirect } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
+export const metadata = {
+  title: 'WordStory - Learn Vocabulary through Stories',
+  description: 'Master English, Hindi, and Marathi vocabulary with engaging stories and active recall.',
+};
+
 export default async function Home() {
-  // Fetch the first word alphabetically
+  // Efficiently fetch only the single first word
   const { data } = await supabase
     .from('words')
     .select('word')
     .order('word', { ascending: true })
-    .limit(1);
+    .limit(1)
+    .single();
 
-  if (data && data.length > 0) {
-    // Instantly redirect to that word's dedicated page
-    redirect(`/word/${data[0].word.toLowerCase()}`);
+  if (data) {
+    redirect(`/word/${data.word.toLowerCase()}`);
   }
 
-  // Fallback if the database is completely empty
+  // Fallback with Emerald Green styling to match your new theme
   return (
-    <div className="app-container" style={{ alignItems: 'center', justifyContent: 'center' }}>
-      <h2 style={{ fontFamily: 'var(--font-logo)' }}>WORDSTORY.co</h2>
-      <p>No words found in database. Please add some from the admin panel.</p>
+    <div style={{ 
+      display: 'flex', flexDirection: 'column', alignItems: 'center', 
+      justifyContent: 'center', height: '100vh', backgroundColor: '#f8fafc',
+      fontFamily: 'system-ui, sans-serif'
+    }}>
+      <h1 style={{ fontWeight: 900, fontSize: '24px', color: '#0f172a' }}>
+        WORD<span style={{ color: '#10b981' }}>STORY</span>
+      </h1>
+      <p style={{ color: '#64748b', marginTop: '8px' }}>No words found in database. Add some via the admin panel.</p>
     </div>
   );
 }
