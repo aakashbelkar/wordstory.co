@@ -8,6 +8,7 @@ const IconEn = () => <svg viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3
 const IconHi = () => <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>;
 const IconPen = () => <svg viewBox="0 0 24 24"><path d="M12 19l7-7 3 3-7 7-3-3z"></path><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path><path d="M2 2l7.586 7.586"></path><circle cx="11" cy="11" r="2"></circle></svg>;
 const IconLink = () => <svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>;
+const IconBook = () => <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>;
 
 interface WordClientProps {
   currentItem: any;
@@ -28,6 +29,17 @@ const getPremiumGradient = (word: string) => {
   return gradients[word.length % gradients.length];
 };
 
+// --- THE FIX: This safely converts messy text into perfect arrays ---
+const parseTags = (tagData: any) => {
+  if (!tagData) return [];
+  if (Array.isArray(tagData)) return tagData;
+  if (typeof tagData === 'string') {
+    // Split by comma, trim whitespace, and remove empty strings
+    return tagData.split(',').map(tag => tag.trim()).filter(Boolean); 
+  }
+  return [];
+};
+
 export default function WordClient({ currentItem, prevWord, nextWord, totalCount, currentIndex }: WordClientProps) {
   const router = useRouter();
   const [theme, setTheme] = useState('light');
@@ -36,8 +48,15 @@ export default function WordClient({ currentItem, prevWord, nextWord, totalCount
   const [isModalOpen, setIsModalOpen] = useState(false);
   const flashcardRef = useRef<HTMLDivElement>(null);
 
-  // Calculate Progress Percentage for the Edge Bar
   const progressPercentage = ((currentIndex + 1) / totalCount) * 100;
+
+  // --- APPLYING THE FIX ---
+  const safeSynonyms = parseTags(currentItem.synonyms);
+  const safeAntonyms = parseTags(currentItem.antonyms);
+  const safeWordFamily = parseTags(currentItem.word_family);
+  const safeCollocations = parseTags(currentItem.collocations);
+  
+  const hasRelations = safeSynonyms.length > 0 || safeAntonyms.length > 0 || safeWordFamily.length > 0 || safeCollocations.length > 0;
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') || 'light';
@@ -53,10 +72,9 @@ export default function WordClient({ currentItem, prevWord, nextWord, totalCount
     localStorage.setItem('theme', newTheme);
   };
 
-  // --- HAPTIC FEEDBACK (Micro-interaction magic) ---
   const triggerHaptic = () => {
     if (typeof window !== 'undefined' && window.navigator && window.navigator.vibrate) {
-      window.navigator.vibrate(15); // A crisp, 15ms physical "tick" on mobile
+      window.navigator.vibrate(15); 
     }
   };
 
@@ -91,7 +109,7 @@ export default function WordClient({ currentItem, prevWord, nextWord, totalCount
 
   const navigateTo = (word: string | null) => {
     if (!word) return;
-    triggerHaptic(); // Vibrate when swiping or clicking next!
+    triggerHaptic();
     if (flashcardRef.current) {
       flashcardRef.current.style.transform = 'translateY(10px)';
       flashcardRef.current.style.opacity = '0';
@@ -130,10 +148,8 @@ export default function WordClient({ currentItem, prevWord, nextWord, totalCount
 
   return (
     <div className="app-container" style={{ position: 'relative' }}>
-      {/* THE EDGE PROGRESS BAR */}
       <div style={{ position: 'absolute', top: 0, left: 0, height: '4px', backgroundColor: 'var(--accent-text)', width: `${progressPercentage}%`, zIndex: 9999, transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1)', borderTopRightRadius: '4px', borderBottomRightRadius: '4px', boxShadow: '0 0 10px var(--accent-text)' }} />
 
-      {/* GLASSMORPHIC INFO MODAL */}
       <div className={`modal-overlay ${isModalOpen ? 'active' : ''}`} style={{ backdropFilter: 'blur(8px)', backgroundColor: 'rgba(0,0,0,0.4)' }} onClick={() => setIsModalOpen(false)}>
         <div className="modal-content" style={{ backdropFilter: 'blur(20px)', backgroundColor: 'var(--app-bg)', border: '1px solid rgba(255,255,255,0.1)' }} onClick={e => e.stopPropagation()}>
           <button className="close-modal" onClick={() => { triggerHaptic(); setIsModalOpen(false); }}>&times;</button>
@@ -161,7 +177,6 @@ export default function WordClient({ currentItem, prevWord, nextWord, totalCount
         </div>
       </header>
 
-      {/* SEARCH BAR WITH GLASS DROPDOWN */}
       <div className="search-wrapper px-dynamic">
         <div className="search-input-container">
           <input type="text" id="searchInput" placeholder="Search vocabulary..." autoComplete="off" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
@@ -179,7 +194,6 @@ export default function WordClient({ currentItem, prevWord, nextWord, totalCount
         )}
       </div>
 
-      {/* TOP CONTROLS */}
       <div className="nav-controls px-dynamic">
         <button onClick={() => navigateTo(prevWord)} className="nav-btn" style={{ opacity: prevWord ? 1 : 0.3, cursor: prevWord ? 'pointer' : 'default' }}>&larr; {prevWord || 'Prev'}</button>
         <div className="progress-container">
@@ -189,15 +203,9 @@ export default function WordClient({ currentItem, prevWord, nextWord, totalCount
         <button onClick={() => navigateTo(nextWord)} className="nav-btn" style={{ opacity: nextWord ? 1 : 0.3, cursor: nextWord ? 'pointer' : 'default' }}>{nextWord || 'Next'} &rarr;</button>
       </div>
 
-      {/* FLASHCARD CONTENT */}
       <div className="flashcard-container px-dynamic" id="flashcardArea" ref={flashcardRef} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd} style={{ transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)' }}>
         
-        {/* APPLE-STYLE EDITORIAL HERO CARD */}
-        <div style={{ 
-            width: '100%', aspectRatio: '4/3', borderRadius: '20px', overflow: 'hidden', 
-            position: 'relative', marginBottom: '32px', boxShadow: '0 10px 30px rgba(0,0,0,0.1)',
-            background: currentItem.image_url ? '#000' : getPremiumGradient(currentItem.word)
-        }}>
+        <div style={{ width: '100%', aspectRatio: '4/3', borderRadius: '20px', overflow: 'hidden', position: 'relative', marginBottom: '32px', boxShadow: '0 10px 30px rgba(0,0,0,0.1)', background: currentItem.image_url ? '#000' : getPremiumGradient(currentItem.word) }}>
           {currentItem.image_url && (
             <img src={currentItem.image_url} alt={currentItem.word} style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', top: 0, left: 0 }} />
           )}
@@ -207,17 +215,22 @@ export default function WordClient({ currentItem, prevWord, nextWord, totalCount
               <h2 style={{ color: '#ffffff', fontFamily: 'var(--font-serif)', fontSize: '48px', fontWeight: 700, margin: '0 0 4px 0', lineHeight: 1 }}>{currentItem.word}</h2>
               <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: '18px', letterSpacing: '0.02em' }}>{currentItem.phonetic}</div>
             </div>
-            <button 
-              onClick={() => playAudio(currentItem.word)}
-              style={{ width: '48px', height: '48px', borderRadius: '50%', border: 'none', cursor: 'pointer', background: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(10px)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'transform 0.1s ease, background 0.2s ease' }}
-              onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.92)'}
-              onMouseUp={(e) => e.currentTarget.style.transform = 'scale(1)'}
-              onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
-            >
+            <button onClick={() => playAudio(currentItem.word)} style={{ width: '48px', height: '48px', borderRadius: '50%', border: 'none', cursor: 'pointer', background: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(10px)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'transform 0.1s ease, background 0.2s ease' }} onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.92)'} onMouseUp={(e) => e.currentTarget.style.transform = 'scale(1)'} onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}>
               <svg viewBox="0 0 24 24" style={{ width: '24px', height: '24px', fill: 'currentColor' }}><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
             </button>
           </div>
         </div>
+
+        {currentItem.story_hi && (
+          <div className="content-section" style={{ marginBottom: '40px' }}>
+            <div className="section-header" style={{ color: 'var(--accent-text)', fontSize: '18px', fontWeight: 700 }}>
+              <IconBook /> The Word Story
+            </div>
+            <div style={{ padding: '24px', backgroundColor: 'var(--app-bg)', border: '1px solid var(--border)', borderRadius: '16px', boxShadow: '0 8px 30px rgba(0,0,0,0.04)', marginTop: '12px' }}>
+              <p className="content-text hindi" style={{ fontSize: '17px', lineHeight: '1.8', margin: 0, color: 'var(--text-main)' }} dangerouslySetInnerHTML={{ __html: currentItem.story_hi }} />
+            </div>
+          </div>
+        )}
 
         <div className="content-section">
           <div className="section-header"><IconEn /> Meaning in English</div>
@@ -229,7 +242,6 @@ export default function WordClient({ currentItem, prevWord, nextWord, totalCount
           <p className="content-text hindi">{currentItem.meaning_hi}</p>
         </div>
 
-        {/* EDITORIAL QUOTE DESIGN FOR EXAMPLES */}
         {currentItem.example_en && (
           <div className="content-section">
             <div className="section-header"><IconPen /> Example in English</div>
@@ -250,19 +262,49 @@ export default function WordClient({ currentItem, prevWord, nextWord, totalCount
           </div>
         )}
 
-        {/* RELATIONS */}
-        {(currentItem.synonyms?.length > 0 || currentItem.antonyms?.length > 0 || currentItem.word_family?.length > 0 || currentItem.collocations?.length > 0) && (
+        {hasRelations && (
           <div className="relations-wrapper">
             <div className="relations-main-title"><IconLink /> Word Relations</div>
-            {currentItem.synonyms?.length > 0 && <div className="relation-group"><h4>Synonyms</h4><div className="tag-list">{currentItem.synonyms.map((t: string) => <span key={t} className="tag" style={{ transition: 'transform 0.2s ease' }} onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.05)'} onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}>{t}</span>)}</div></div>}
-            {currentItem.antonyms?.length > 0 && <div className="relation-group"><h4>Antonyms</h4><div className="tag-list">{currentItem.antonyms.map((t: string) => <span key={t} className="tag" style={{ transition: 'transform 0.2s ease' }} onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.05)'} onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}>{t}</span>)}</div></div>}
-            {currentItem.word_family?.length > 0 && <div className="relation-group"><h4>Word Family</h4><div className="tag-list">{currentItem.word_family.map((t: string) => <span key={t} className="tag" style={{ transition: 'transform 0.2s ease' }} onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.05)'} onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}>{t}</span>)}</div></div>}
-            {currentItem.collocations?.length > 0 && <div className="relation-group"><h4>Collocations</h4><div className="tag-list">{currentItem.collocations.map((t: string) => <span key={t} className="tag" style={{ transition: 'transform 0.2s ease' }} onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.05)'} onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}>{t}</span>)}</div></div>}
+            
+            {safeSynonyms.length > 0 && (
+              <div className="relation-group">
+                <h4>Synonyms</h4>
+                <div className="tag-list">
+                  {safeSynonyms.map((t: string) => <span key={t} className="tag" style={{ transition: 'transform 0.2s ease' }} onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.05)'} onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}>{t}</span>)}
+                </div>
+              </div>
+            )}
+            
+            {safeAntonyms.length > 0 && (
+              <div className="relation-group">
+                <h4>Antonyms</h4>
+                <div className="tag-list">
+                  {safeAntonyms.map((t: string) => <span key={t} className="tag" style={{ transition: 'transform 0.2s ease' }} onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.05)'} onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}>{t}</span>)}
+                </div>
+              </div>
+            )}
+            
+            {safeWordFamily.length > 0 && (
+              <div className="relation-group">
+                <h4>Word Family</h4>
+                <div className="tag-list">
+                  {safeWordFamily.map((t: string) => <span key={t} className="tag" style={{ transition: 'transform 0.2s ease' }} onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.05)'} onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}>{t}</span>)}
+                </div>
+              </div>
+            )}
+            
+            {safeCollocations.length > 0 && (
+              <div className="relation-group">
+                <h4>Collocations</h4>
+                <div className="tag-list">
+                  {safeCollocations.map((t: string) => <span key={t} className="tag" style={{ transition: 'transform 0.2s ease' }} onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.05)'} onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}>{t}</span>)}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
 
-      {/* BOTTOM CONTROLS */}
       <div className="nav-controls bottom px-dynamic">
         <button onClick={() => navigateTo(prevWord)} className="nav-btn" style={{ opacity: prevWord ? 1 : 0.3, cursor: prevWord ? 'pointer' : 'default' }}>&larr; {prevWord || 'Prev'}</button>
         <div className="progress-container">

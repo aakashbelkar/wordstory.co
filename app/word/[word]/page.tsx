@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { Metadata } from 'next';
+import { notFound } from 'next/navigation'; // <-- 1. Imported the trigger
 import WordClient from './WordClient';
 
 // 1. Generate SEO Meta Tags dynamically
@@ -25,14 +26,15 @@ export default async function WordPage({ params }: { params: Promise<{ word: str
   // A. Fetch the current word
   const { data: currentItem } = await supabase.from('words').select('*').ilike('word', decodedWord).single();
 
+  // 2. THE CRITICAL CHANGE: Trigger the new 404 page if the word doesn't exist
   if (!currentItem) {
-    return <div className="app-container" style={{ alignItems: 'center', justifyContent: 'center' }}><h2>Word not found.</h2></div>;
+    notFound(); 
   }
 
   // B. Get Total Dictionary Size
   const { count: totalCount } = await supabase.from('words').select('*', { count: 'exact', head: true });
 
-  // C. Calculate the exact index of this word (how many words come before it alphabetically)
+  // C. Calculate the exact index of this word
   const { count: precedingCount } = await supabase.from('words').select('*', { count: 'exact', head: true }).lt('word', currentItem.word);
   const currentIndex = precedingCount || 0;
 

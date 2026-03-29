@@ -51,7 +51,7 @@ export default function NotFound() {
 
           {/* Action 2: User Research / Crowdsourcing */}
           <a 
-            href="mailto:hello@wordstory.co?subject=Please add this word!&body=Hi! I searched for a word and couldn't find it. Please add it to the dictionary: " 
+            href="mailto:aakashbelkar@gmail.com?subject=Please add this word!&body=Hi! I searched for a word and couldn't find it. Please add it to the dictionary: " 
             style={{ 
               backgroundColor: 'transparent', 
               color: 'var(--text-main)', 
