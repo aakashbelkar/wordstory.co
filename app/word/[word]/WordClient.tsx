@@ -17,6 +17,18 @@ interface WordClientProps {
   currentIndex: number;
 }
 
+// Generates a consistent premium dark gradient based on the word length
+const getPremiumGradient = (word: string) => {
+  const gradients = [
+    'linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%)', // Deep Sea
+    'linear-gradient(135deg, #141e30 0%, #243b55 100%)', // Midnight
+    'linear-gradient(135deg, #2b5876 0%, #4e4376 100%)', // Deep Space
+    'linear-gradient(135deg, #1e1366 0%, #2a0845 100%)', // Royal Dark
+    'linear-gradient(135deg, #232526 0%, #414345 100%)'  // Carbon
+  ];
+  return gradients[word.length % gradients.length];
+};
+
 export default function WordClient({ currentItem, prevWord, nextWord, totalCount, currentIndex }: WordClientProps) {
   const router = useRouter();
   const [theme, setTheme] = useState('light');
@@ -25,7 +37,6 @@ export default function WordClient({ currentItem, prevWord, nextWord, totalCount
   const [isModalOpen, setIsModalOpen] = useState(false);
   const flashcardRef = useRef<HTMLDivElement>(null);
 
-  // Theme Logic
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') || 'light';
     setTheme(savedTheme);
@@ -48,7 +59,6 @@ export default function WordClient({ currentItem, prevWord, nextWord, totalCount
     }
   };
 
-  // Search Logic
   useEffect(() => {
     const delayDebounceFn = setTimeout(async () => {
       if (searchQuery.length > 0) {
@@ -67,13 +77,15 @@ export default function WordClient({ currentItem, prevWord, nextWord, totalCount
     router.push(`/word/${wordText.toLowerCase()}`);
   };
 
-  // Navigation Logic (Keyboard & Swipe)
   const navigateTo = (word: string | null) => {
     if (!word) return;
-    if (flashcardRef.current) flashcardRef.current.style.opacity = '0';
+    if (flashcardRef.current) {
+      flashcardRef.current.style.transform = 'translateY(10px)';
+      flashcardRef.current.style.opacity = '0';
+    }
     setTimeout(() => {
       router.push(`/word/${word.toLowerCase()}`);
-    }, 100);
+    }, 150);
   };
 
   useEffect(() => {
@@ -94,11 +106,9 @@ export default function WordClient({ currentItem, prevWord, nextWord, totalCount
     if (touchEndX - touchStartX > 50) navigateTo(prevWord);
   };
 
-  // Jump to specific card number logic
   const handleJumpToCard = async (e: React.ChangeEvent<HTMLInputElement>) => {
     let val = Number(e.target.value);
     if (val >= 1 && val <= totalCount) {
-      // Find the word at that exact index
       const { data } = await supabase.from('words').select('word').order('word', { ascending: true }).range(val - 1, val - 1).single();
       if (data) navigateTo(data.word);
     }
@@ -106,9 +116,9 @@ export default function WordClient({ currentItem, prevWord, nextWord, totalCount
 
   return (
     <div className="app-container">
-      {/* FIXED INFO MODAL */}
-      <div className={`modal-overlay ${isModalOpen ? 'active' : ''}`} onClick={() => setIsModalOpen(false)}>
-        <div className="modal-content" onClick={e => e.stopPropagation()}>
+      {/* GLASSMORPHIC INFO MODAL */}
+      <div className={`modal-overlay ${isModalOpen ? 'active' : ''}`} style={{ backdropFilter: 'blur(8px)', backgroundColor: 'rgba(0,0,0,0.4)' }} onClick={() => setIsModalOpen(false)}>
+        <div className="modal-content" style={{ backdropFilter: 'blur(20px)', backgroundColor: 'var(--app-bg)', border: '1px solid rgba(255,255,255,0.1)' }} onClick={e => e.stopPropagation()}>
           <button className="close-modal" onClick={() => setIsModalOpen(false)}>&times;</button>
           <h3 className="modal-title">How to use WordStory</h3>
           <ul className="modal-list">
@@ -134,13 +144,14 @@ export default function WordClient({ currentItem, prevWord, nextWord, totalCount
         </div>
       </header>
 
+      {/* SEARCH BAR WITH GLASS DROPDOWN */}
       <div className="search-wrapper px-dynamic">
         <div className="search-input-container">
           <input type="text" id="searchInput" placeholder="Search vocabulary..." autoComplete="off" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
           {searchQuery && <button id="clearBtn" aria-label="Clear search" onClick={() => { setSearchQuery(''); setSearchResults([]); }}>&times;</button>}
         </div>
         {searchResults.length > 0 && (
-          <ul className="autocomplete-dropdown" style={{ display: 'block' }}>
+          <ul className="autocomplete-dropdown" style={{ display: 'block', backdropFilter: 'blur(16px)', backgroundColor: theme === 'dark' ? 'rgba(30,30,30,0.85)' : 'rgba(255,255,255,0.85)' }}>
             {searchResults.map((result) => (
               <li key={result.id} className="autocomplete-item" onClick={() => selectSearchResult(result.word)}>
                 <span className="auto-word">{result.word}</span>
@@ -153,35 +164,53 @@ export default function WordClient({ currentItem, prevWord, nextWord, totalCount
 
       {/* TOP CONTROLS */}
       <div className="nav-controls px-dynamic">
-        {prevWord ? (
-          <Link href={`/word/${prevWord.toLowerCase()}`} className="nav-btn" style={{ textDecoration: 'none' }}>&larr; {prevWord}</Link>
-        ) : <div className="nav-btn" style={{ opacity: 0.3 }}>&larr; Prev</div>}
-        
+        <button onClick={() => navigateTo(prevWord)} className="nav-btn" style={{ opacity: prevWord ? 1 : 0.3, cursor: prevWord ? 'pointer' : 'default' }}>&larr; {prevWord || 'Prev'}</button>
         <div className="progress-container">
           <input type="number" className="progress-input" min="1" max={totalCount} value={currentIndex + 1} onChange={handleJumpToCard} />
           <span className="totalProgress"> / {totalCount}</span>
         </div>
-
-        {nextWord ? (
-          <Link href={`/word/${nextWord.toLowerCase()}`} className="nav-btn" style={{ textDecoration: 'none' }}>{nextWord} &rarr;</Link>
-        ) : <div className="nav-btn" style={{ opacity: 0.3 }}>Next &rarr;</div>}
+        <button onClick={() => navigateTo(nextWord)} className="nav-btn" style={{ opacity: nextWord ? 1 : 0.3, cursor: nextWord ? 'pointer' : 'default' }}>{nextWord || 'Next'} &rarr;</button>
       </div>
 
       {/* FLASHCARD CONTENT */}
-      <div className="flashcard-container px-dynamic" id="flashcardArea" ref={flashcardRef} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd} style={{ transition: 'opacity 0.15s ease' }}>
-        <div className="word-header-row">
-          <h2 className="word-title">{currentItem.word}</h2>
-          <button className="audio-btn" aria-label="Listen" onClick={() => playAudio(currentItem.word)}>
-            <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
-          </button>
-        </div>
-        <div className="word-phonetic">{currentItem.phonetic}</div>
-
-        {currentItem.image_url && (
-          <div className="hero-image-container">
-            <img src={currentItem.image_url} alt={currentItem.word} className="hero-image" onError={(e) => e.currentTarget.parentElement!.style.display = 'none'} />
+      <div className="flashcard-container px-dynamic" id="flashcardArea" ref={flashcardRef} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd} style={{ transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)' }}>
+        
+        {/* APPLE-STYLE EDITORIAL HERO CARD */}
+        <div style={{ 
+            width: '100%', aspectRatio: '4/3', borderRadius: '20px', overflow: 'hidden', 
+            position: 'relative', marginBottom: '32px', boxShadow: '0 10px 30px rgba(0,0,0,0.1)',
+            background: currentItem.image_url ? '#000' : getPremiumGradient(currentItem.word)
+        }}>
+          {currentItem.image_url && (
+            <img src={currentItem.image_url} alt={currentItem.word} style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', top: 0, left: 0 }} />
+          )}
+          
+          {/* Dark Gradient Overlay for text readability */}
+          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.3) 50%, transparent 100%)' }}></div>
+          
+          {/* Card Content Overlay */}
+          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+            <div>
+              <h2 style={{ color: '#ffffff', fontFamily: 'var(--font-serif)', fontSize: '48px', fontWeight: 700, margin: '0 0 4px 0', lineHeight: 1 }}>{currentItem.word}</h2>
+              <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: '18px', letterSpacing: '0.02em' }}>{currentItem.phonetic}</div>
+            </div>
+            
+            {/* Glassmorphic Audio Button */}
+            <button 
+              onClick={() => playAudio(currentItem.word)}
+              style={{ 
+                width: '48px', height: '48px', borderRadius: '50%', border: 'none', cursor: 'pointer',
+                background: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(10px)', color: '#fff',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'transform 0.1s ease, background 0.2s ease'
+              }}
+              onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.92)'}
+              onMouseUp={(e) => e.currentTarget.style.transform = 'scale(1)'}
+              onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+            >
+              <svg viewBox="0 0 24 24" style={{ width: '24px', height: '24px', fill: 'currentColor' }}><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+            </button>
           </div>
-        )}
+        </div>
 
         <div className="content-section">
           <div className="section-header"><IconEn /> Meaning in English</div>
@@ -210,28 +239,22 @@ export default function WordClient({ currentItem, prevWord, nextWord, totalCount
         {(currentItem.synonyms?.length > 0 || currentItem.antonyms?.length > 0 || currentItem.word_family?.length > 0 || currentItem.collocations?.length > 0) && (
           <div className="relations-wrapper">
             <div className="relations-main-title"><IconLink /> Word Relations</div>
-            {currentItem.synonyms?.length > 0 && <div className="relation-group"><h4>Synonyms</h4><div className="tag-list">{currentItem.synonyms.map((t: string) => <span key={t} className="tag">{t}</span>)}</div></div>}
-            {currentItem.antonyms?.length > 0 && <div className="relation-group"><h4>Antonyms</h4><div className="tag-list">{currentItem.antonyms.map((t: string) => <span key={t} className="tag">{t}</span>)}</div></div>}
-            {currentItem.word_family?.length > 0 && <div className="relation-group"><h4>Word Family</h4><div className="tag-list">{currentItem.word_family.map((t: string) => <span key={t} className="tag">{t}</span>)}</div></div>}
-            {currentItem.collocations?.length > 0 && <div className="relation-group"><h4>Collocations</h4><div className="tag-list">{currentItem.collocations.map((t: string) => <span key={t} className="tag">{t}</span>)}</div></div>}
+            {currentItem.synonyms?.length > 0 && <div className="relation-group"><h4>Synonyms</h4><div className="tag-list">{currentItem.synonyms.map((t: string) => <span key={t} className="tag" style={{ transition: 'transform 0.2s ease' }} onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.05)'} onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}>{t}</span>)}</div></div>}
+            {currentItem.antonyms?.length > 0 && <div className="relation-group"><h4>Antonyms</h4><div className="tag-list">{currentItem.antonyms.map((t: string) => <span key={t} className="tag" style={{ transition: 'transform 0.2s ease' }} onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.05)'} onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}>{t}</span>)}</div></div>}
+            {currentItem.word_family?.length > 0 && <div className="relation-group"><h4>Word Family</h4><div className="tag-list">{currentItem.word_family.map((t: string) => <span key={t} className="tag" style={{ transition: 'transform 0.2s ease' }} onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.05)'} onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}>{t}</span>)}</div></div>}
+            {currentItem.collocations?.length > 0 && <div className="relation-group"><h4>Collocations</h4><div className="tag-list">{currentItem.collocations.map((t: string) => <span key={t} className="tag" style={{ transition: 'transform 0.2s ease' }} onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.05)'} onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}>{t}</span>)}</div></div>}
           </div>
         )}
       </div>
 
       {/* BOTTOM CONTROLS */}
       <div className="nav-controls bottom px-dynamic">
-        {prevWord ? (
-          <Link href={`/word/${prevWord.toLowerCase()}`} className="nav-btn" style={{ textDecoration: 'none' }}>&larr; {prevWord}</Link>
-        ) : <div className="nav-btn" style={{ opacity: 0.3 }}>&larr; Prev</div>}
-        
+        <button onClick={() => navigateTo(prevWord)} className="nav-btn" style={{ opacity: prevWord ? 1 : 0.3, cursor: prevWord ? 'pointer' : 'default' }}>&larr; {prevWord || 'Prev'}</button>
         <div className="progress-container">
           <input type="number" className="progress-input" min="1" max={totalCount} value={currentIndex + 1} onChange={handleJumpToCard} />
           <span className="totalProgress"> / {totalCount}</span>
         </div>
-
-        {nextWord ? (
-          <Link href={`/word/${nextWord.toLowerCase()}`} className="nav-btn" style={{ textDecoration: 'none' }}>{nextWord} &rarr;</Link>
-        ) : <div className="nav-btn" style={{ opacity: 0.3 }}>Next &rarr;</div>}
+        <button onClick={() => navigateTo(nextWord)} className="nav-btn" style={{ opacity: nextWord ? 1 : 0.3, cursor: nextWord ? 'pointer' : 'default' }}>{nextWord || 'Next'} &rarr;</button>
       </div>
 
     </div>
