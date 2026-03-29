@@ -104,7 +104,7 @@ header h1 {
 .icon-btn svg { width: 22px; height: 22px; fill: currentColor; }
 
 /* Search Bar & Autocomplete */
-.search-wrapper { padding-top: 16px; position: relative; z-index: 100; }
+.search-wrapper { padding-top: 16px; padding-bottom: 16px; position: relative; z-index: 100; }
 .search-input-container { position: relative; display: flex; align-items: center; }
 
 #searchInput {
@@ -138,35 +138,72 @@ header h1 {
 .auto-word { font-weight: 600; font-size: 16px; color: var(--text-main); }
 .auto-meaning { font-size: 14px; color: var(--text-light); }
 
-/* Navigation Controls */
-.nav-controls {
-    padding-top: 16px; padding-bottom: 16px; display: flex;
-    justify-content: space-between; align-items: center;
-    border-bottom: 1px solid var(--border); background-color: var(--app-bg);
-}
-.nav-controls.bottom {
-    border-bottom: none; border-top: 1px solid var(--border); margin-top: auto; 
-}
+/* NAVIGATION FIX: COMPACT ON DESKTOP, FLEXIBLE ON MOBILE */
+        .nav-controls {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin: 16px auto; /* Centered with margin auto */
+          width: 100%;
+          max-width: 600px; /* NEW: Keeps buttons closer together on Desktop */
+          gap: 12px;
+        }
 
-.nav-btn {
-    background: none; border: none; font-family: var(--font-sans);
-    font-size: 15px; font-weight: 600; color: var(--text-light);
-    cursor: pointer; padding: 10px 16px; border-radius: 999px; transition: all 0.2s ease;
-}
-.nav-btn:hover:not(:disabled) { color: var(--text-main); background-color: var(--bg-color); }
-.nav-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+        .nav-btn {
+          flex: 0 1 auto; /* NEW: Prevents stretching too far */
+          display: flex;
+          align-items: center;
+          background: var(--card-bg);
+          border: 1px solid var(--border);
+          padding: 8px 14px;
+          border-radius: 12px;
+          font-weight: 700;
+          font-size: 13px;
+          color: var(--text-main);
+          cursor: pointer;
+          min-width: 0; /* Required for ellipsis */
+          transition: all 0.2s ease;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+        }
 
-.progress-container {
-    display: flex; align-items: center; font-size: 16px; font-weight: 500;
-    color: var(--text-light); background-color: var(--bg-color);
-    padding: 6px 16px; border-radius: 999px;
-}
+        .nav-btn:hover {
+          border-color: var(--accent-text);
+          transform: translateY(-1px);
+        }
 
-.progress-input {
-    background: transparent; border: none; color: var(--text-main);
-    font-weight: 600; font-size: 16px; font-family: var(--font-sans);
-    text-align: right; width: 32px; outline: none; padding: 0;
-}
+        .nav-text-span {
+          display: inline-block;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          margin: 0 4px;
+          max-width: 100px; /* Limits how long the word can be */
+        }
+
+        .progress-container {
+          flex-shrink: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 4px;
+          color: var(--text-light);
+          font-size: 12px;
+          font-weight: 800;
+          min-width: 85px; /* Protects the 1 / 100 area */
+        }
+
+        .progress-input {
+          width: 42px;
+          text-align: center;
+          border: 1px solid var(--border);
+          border-radius: 6px;
+          padding: 4px 0;
+          background: var(--hover-bg);
+          color: var(--text-main);
+          font-size: 12px;
+          font-weight: 900;
+          outline: none;
+        }
 .progress-input::-webkit-outer-spin-button, .progress-input::-webkit-inner-spin-button {
     -webkit-appearance: none; margin: 0;
 }

@@ -407,10 +407,45 @@ export default function WordClient({ currentItem, prevWord, nextWord, totalCount
           )}
         </div>
 
-        <div className="nav-controls bottom px-dynamic">
-          <button onClick={() => navigateTo(prevWord)} className="nav-btn" style={{ opacity: prevWord ? 1 : 0.3 }}>&larr; {prevWord || 'Prev'}</button>
-          <div className="progress-container"><input type="number" className="progress-input" value={currentIndex + 1} onChange={handleJumpToCard} /><span> / {totalCount}</span></div>
-          <button onClick={() => navigateTo(nextWord)} className="nav-btn" style={{ opacity: nextWord ? 1 : 0.3 }}>{nextWord || 'Next'} &rarr;</button>
+        <div className="nav-controls px-dynamic">
+          {/* PREVIOUS BUTTON */}
+          <button 
+            onClick={() => navigateTo(prevWord)} 
+            className="nav-btn" 
+            style={{ opacity: prevWord ? 1 : 0.2, cursor: prevWord ? 'pointer' : 'default' }}
+          >
+            <span style={{ fontSize: '16px' }}>&larr;</span>
+            <span className="nav-text-span">{prevWord || 'Prev'}</span>
+          </button>
+          
+          {/* CENTER PROGRESS */}
+          <div className="progress-container">
+            <input 
+  type="number" 
+  className="progress-input" 
+  value={currentIndex + 1} 
+  onChange={handleJumpToCard}
+  onFocus={(e) => e.target.select()}
+  inputMode="numeric" // Forces numeric keypad on iPhone/Android
+  min="1"
+  max={totalCount}
+/>
+            <span>/ {totalCount}</span>
+          </div>
+          
+          {/* NEXT BUTTON */}
+          <button 
+            onClick={() => navigateTo(nextWord)} 
+            className="nav-btn" 
+            style={{ 
+              opacity: nextWord ? 1 : 0.3, 
+              cursor: nextWord ? 'pointer' : 'default',
+              justifyContent: 'flex-end' 
+            }}
+          >
+            <span className="nav-text-span">{nextWord || 'Next'}</span>
+            <span style={{ fontSize: '16px' }}>&rarr;</span>
+          </button>
         </div>
 
         <div className="flashcard-container px-dynamic" id="flashcardArea" ref={flashcardRef} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd} style={{ transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)' }}>
@@ -493,10 +528,45 @@ export default function WordClient({ currentItem, prevWord, nextWord, totalCount
             </div>
           </div>
         </div>
-        <div className="nav-controls bottom px-dynamic">
-          <button onClick={() => navigateTo(prevWord)} className="nav-btn" style={{ opacity: prevWord ? 1 : 0.3 }}>&larr; {prevWord || 'Prev'}</button>
-          <div className="progress-container"><input type="number" className="progress-input" value={currentIndex + 1} onChange={handleJumpToCard} /><span> / {totalCount}</span></div>
-          <button onClick={() => navigateTo(nextWord)} className="nav-btn" style={{ opacity: nextWord ? 1 : 0.3 }}>{nextWord || 'Next'} &rarr;</button>
+        <div className="nav-controls px-dynamic">
+          {/* PREVIOUS BUTTON */}
+          <button 
+            onClick={() => navigateTo(prevWord)} 
+            className="nav-btn" 
+            style={{ opacity: prevWord ? 1 : 0.2, cursor: prevWord ? 'pointer' : 'default' }}
+          >
+            <span style={{ fontSize: '16px' }}>&larr;</span>
+            <span className="nav-text-span">{prevWord || 'Prev'}</span>
+          </button>
+          
+          {/* CENTER PROGRESS */}
+          <div className="progress-container">
+            <input 
+  type="number" 
+  className="progress-input" 
+  value={currentIndex + 1} 
+  onChange={handleJumpToCard}
+  onFocus={(e) => e.target.select()}
+  inputMode="numeric" // Forces numeric keypad on iPhone/Android
+  min="1"
+  max={totalCount}
+/>
+            <span>/ {totalCount}</span>
+          </div>
+          
+          {/* NEXT BUTTON */}
+          <button 
+            onClick={() => navigateTo(nextWord)} 
+            className="nav-btn" 
+            style={{ 
+              opacity: nextWord ? 1 : 0.3, 
+              cursor: nextWord ? 'pointer' : 'default',
+              justifyContent: 'flex-end' 
+            }}
+          >
+            <span className="nav-text-span">{nextWord || 'Next'}</span>
+            <span style={{ fontSize: '16px' }}>&rarr;</span>
+          </button>
         </div>
       </div>
     </div>
